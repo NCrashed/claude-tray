@@ -14,6 +14,7 @@ const RUNTIME_DIR: &str = "/run/claude-tunnel";
 const RUNTIME_CONFIG: &str = "/run/claude-tunnel/ct-wg.conf";
 const ENDPOINT_STATE: &str = "/run/claude-tunnel/endpoint";
 const NETNS_ETC: &str = "/etc/netns/claude-code";
+const UTC_ZONEINFO: &str = "/etc/zoneinfo/UTC";
 const LOCK_FILE: &str = "/run/claude-tunnel.lock";
 const ROOT_UID: u32 = 0;
 
@@ -233,6 +234,7 @@ pub fn allowed_environment_key(key: &str) -> bool {
             | "DBUS_SESSION_BUS_ADDRESS"
             | "DESKTOP_STARTUP_ID"
             | "BROWSER"
+            | "TZ"
             | "SSH_AUTH_SOCK"
             | "SSL_CERT_FILE"
             | "SSL_CERT_DIR"
@@ -291,6 +293,9 @@ fn write_runtime_files(validated: &tunnel::ValidatedTunnel) -> Result<(), String
         write_runtime_config(validated).and_then(|()| {
             write_endpoint(validated.endpoint)
                 .and_then(|()| write_dns_config(&validated.dns_servers))
+                .and_then(|()| {
+                    write_localtime_config_at(Path::new(NETNS_ETC), Path::new(UTC_ZONEINFO))
+                })
         })
     })
 }
@@ -327,6 +332,16 @@ fn write_dns_config(dns_servers: &[std::net::IpAddr]) -> Result<(), String> {
         })
 }
 
+fn write_localtime_config_at(netns_etc: &Path, zoneinfo: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(netns_etc)
+        .map_err(|error| format!("cannot create {}: {error}", netns_etc.display()))
+        .and_then(|()| {
+            std::fs::copy(zoneinfo, netns_etc.join("localtime"))
+                .map(|_| ())
+                .map_err(|error| format!("cannot install protected UTC localtime: {error}"))
+        })
+}
+
 fn down_internal() {
     active_endpoint()
         .into_iter()
@@ -339,6 +354,7 @@ fn down_internal() {
         RUNTIME_CONFIG,
         ENDPOINT_STATE,
         &format!("{NETNS_ETC}/resolv.conf"),
+        &format!("{NETNS_ETC}/localtime"),
     ] {
         let _ = std::fs::remove_file(path);
     }
@@ -472,6 +488,7 @@ mod tests {
         assert!(allowed_environment_key("CLAUDE_CODE_USE_BEDROCK"));
         assert!(allowed_environment_key("XDG_RUNTIME_DIR"));
         assert!(allowed_environment_key("BROWSER"));
+        assert!(allowed_environment_key("TZ"));
         for key in [
             "DISPLAY",
             "WAYLAND_DISPLAY",
@@ -483,6 +500,21 @@ mod tests {
         }
         assert!(!allowed_environment_key("LD_PRELOAD"));
         assert!(!allowed_environment_key("BASH_ENV"));
+    }
+
+    #[test]
+    fn namespace_localtime_is_an_utc_zoneinfo_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let zoneinfo = dir.path().join("UTC");
+        let netns_etc = dir.path().join("etc");
+        std::fs::write(&zoneinfo, b"fake UTC zoneinfo").unwrap();
+
+        write_localtime_config_at(&netns_etc, &zoneinfo).unwrap();
+
+        assert_eq!(
+            std::fs::read(netns_etc.join("localtime")).unwrap(),
+            b"fake UTC zoneinfo"
+        );
     }
 
     #[test]

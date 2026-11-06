@@ -331,16 +331,26 @@ fn merge_status(current: &mut Status, observed: Status) {
 }
 
 fn detect_status(tunnels_dir: &Path) -> Status {
-    if !root::is_up() {
-        return Status::Disconnected;
+    status_for_endpoint(
+        tunnels_dir,
+        root::is_up().then(root::active_endpoint).flatten(),
+    )
+}
+
+fn status_for_endpoint(tunnels_dir: &Path, endpoint: Option<std::net::SocketAddrV4>) -> Status {
+    match endpoint {
+        Some(endpoint) => Status::Connected(
+            matching_tunnel_name(tunnels_dir, endpoint).unwrap_or_else(|| "active tunnel".into()),
+        ),
+        None => Status::Disconnected,
     }
-    let active_name = root::active_endpoint().and_then(|endpoint| {
-        tunnel::discover(tunnels_dir).into_iter().find_map(|item| {
-            let contents = std::fs::read_to_string(&item.path).ok()?;
-            (tunnel::validate(&contents).ok()?.endpoint == endpoint).then_some(item.name)
-        })
-    });
-    Status::Connected(active_name.unwrap_or_else(|| "active tunnel".into()))
+}
+
+fn matching_tunnel_name(tunnels_dir: &Path, endpoint: std::net::SocketAddrV4) -> Option<String> {
+    tunnel::discover(tunnels_dir).into_iter().find_map(|item| {
+        let contents = std::fs::read_to_string(&item.path).ok()?;
+        (tunnel::validate(&contents).ok()?.endpoint == endpoint).then_some(item.name)
+    })
 }
 
 async fn privileged(arguments: &[&OsStr]) -> Result<(), String> {
@@ -375,7 +385,7 @@ fn privileged_output(output: std::process::Output) -> Result<(), String> {
 
 fn run_claude(config: &AppConfig, arguments: &[OsString]) -> Result<u8, String> {
     ensure_tunnel_available()
-        .and_then(|()| protected_browser_environment())
+        .and_then(|()| protected_claude_environment())
         .and_then(|environment| prepare_launch(&config.claude_binary, &environment))
         .and_then(|launch| execute_protected(launch, arguments))
 }
@@ -383,7 +393,7 @@ fn run_claude(config: &AppConfig, arguments: &[OsString]) -> Result<u8, String> 
 fn run_browser(config: &AppConfig, url: &str) -> Result<u8, String> {
     ensure_tunnel_available()
         .and_then(|()| create_browser_profile(&config.browser_profile_dir))
-        .and_then(|()| prepare_launch(&config.browser_binary, &[]))
+        .and_then(|()| prepare_launch(&config.browser_binary, &protected_timezone_environment()))
         .and_then(|launch| execute_protected(launch, &browser_arguments(config, url)))
 }
 
@@ -421,14 +431,24 @@ fn validate_browser_url(url: &OsStr) -> Result<String, String> {
     .ok_or_else(|| "browser opener only accepts http:// or https:// URLs".into())
 }
 
-fn protected_browser_environment() -> Result<Vec<(String, String)>, String> {
+fn protected_timezone_environment() -> Vec<(String, String)> {
+    vec![("TZ".into(), "UTC".into())]
+}
+
+fn protected_claude_environment() -> Result<Vec<(String, String)>, String> {
     executable::browser_opener().and_then(|opener| {
         opener
             .into_os_string()
             .into_string()
-            .map(|path| vec![("BROWSER".into(), path)])
+            .map(protected_claude_environment_with)
             .map_err(|_| "protected browser opener path is not valid UTF-8".into())
     })
+}
+
+fn protected_claude_environment_with(browser_opener: String) -> Vec<(String, String)> {
+    let mut environment = protected_timezone_environment();
+    environment.push(("BROWSER".into(), browser_opener));
+    environment
 }
 
 fn ensure_tunnel_available() -> Result<(), String> {
@@ -608,6 +628,40 @@ mod tests {
     }
 
     #[test]
+    fn active_tunnel_name_requires_the_same_endpoint() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("sample.conf"),
+            r#"
+[Interface]
+PrivateKey = secret
+Address = 10.66.0.2/32
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = public
+Endpoint = 192.0.2.1:51820
+AllowedIPs = 0.0.0.0/0
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            matching_tunnel_name(dir.path(), "192.0.2.1:51820".parse().unwrap()),
+            Some("sample".into())
+        );
+        assert_eq!(
+            matching_tunnel_name(dir.path(), "192.0.2.2:51820".parse().unwrap()),
+            None
+        );
+        assert_eq!(status_for_endpoint(dir.path(), None), Status::Disconnected);
+        assert_eq!(
+            status_for_endpoint(dir.path(), Some("192.0.2.1:51820".parse().unwrap())),
+            Status::Connected("sample".into())
+        );
+    }
+
+    #[test]
     fn pure_launch_helpers_cover_ids_paths_and_environment() {
         assert!(numeric_id("-u").is_ok());
         assert!(resolve_program(&std::env::current_exe().unwrap()).is_ok());
@@ -692,26 +746,29 @@ mod tests {
         })
         .await
         .is_err());
+        assert!(dispatch_user(CliCommand::Root {
+            command: RootCommand::Down
+        })
+        .await
+        .is_err());
     }
 
     #[test]
     fn root_dispatch_rejects_every_variant_for_unprivileged_callers() {
-        if !root::is_up() {
-            assert!(run_root(RootCommand::Down).is_err());
-            assert!(run_root(RootCommand::Up {
-                config: PathBuf::from("missing")
-            })
-            .is_err());
-            assert!(run_root(RootCommand::Exec {
-                uid: 1000,
-                gid: 100,
-                cwd: PathBuf::from("/"),
-                environment_file: PathBuf::from("missing"),
-                program: PathBuf::from("missing"),
-                arguments: vec![],
-            })
-            .is_err());
-        }
+        assert!(run_root(RootCommand::Down).is_err());
+        assert!(run_root(RootCommand::Up {
+            config: PathBuf::from("missing")
+        })
+        .is_err());
+        assert!(run_root(RootCommand::Exec {
+            uid: 1000,
+            gid: 100,
+            cwd: PathBuf::from("/"),
+            environment_file: PathBuf::from("missing"),
+            program: PathBuf::from("missing"),
+            arguments: vec![],
+        })
+        .is_err());
     }
 
     #[test]
@@ -821,6 +878,18 @@ mod tests {
         assert!(browser_url(&[OsString::from("--proxy-server=direct://")]).is_err());
         assert!(
             browser_url(&[OsString::from("https://one"), OsString::from("https://two")]).is_err()
+        );
+    }
+
+    #[test]
+    fn protected_processes_always_use_utc() {
+        assert_eq!(
+            protected_timezone_environment(),
+            vec![("TZ".to_string(), "UTC".to_string())]
+        );
+        assert!(
+            protected_claude_environment_with("/protected/opener".into())
+                .contains(&("TZ".to_string(), "UTC".to_string()))
         );
     }
 }
