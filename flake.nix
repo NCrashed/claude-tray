@@ -38,7 +38,6 @@
                 pkgs.iproute2
                 pkgs.iptables
                 pkgs.procps
-                pkgs.sudo
                 pkgs.util-linux
                 pkgs.wireguard-tools
               ]}
