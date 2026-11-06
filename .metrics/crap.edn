@@ -1,8 +1,9 @@
 {:entries [
   {:name "detect_status", :namespace "claude_tunnel", :complexity 4, :coverage 33.3333, :crap 8.7407}
+  {:name "dispatch_user", :namespace "claude_tunnel", :complexity 7, :coverage 77.7778, :crap 7.5377}
+  {:name "spawn_protected_browser", :namespace "claude_tunnel", :complexity 3, :coverage 23.0769, :crap 7.0965}
   {:name "parse_assignment", :namespace "claude_tunnel::tunnel::TunnelParser", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "label", :namespace "claude_tunnel::status::Status", :complexity 5, :coverage 57.1429, :crap 6.9679}
-  {:name "dispatch_user", :namespace "claude_tunnel", :complexity 6, :coverage 75.0, :crap 6.5625}
   {:name "dispatch_action", :namespace "claude_tunnel", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "poll_status", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "privileged", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
@@ -10,6 +11,7 @@
   {:name "run_tray", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "run_tray_command", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "open_browser", :namespace "claude_tunnel::DesktopRuntime", :complexity 2, :coverage 0.0, :crap 6.0}
+  {:name "browser_opener", :namespace "claude_tunnel::executable", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "is_claude_mark", :namespace "claude_tunnel::icon", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "allowed_environment_key", :namespace "claude_tunnel::root", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "down_internal", :namespace "claude_tunnel::root", :complexity 2, :coverage 0.0, :crap 6.0}
@@ -22,7 +24,10 @@
   {:name "load_from", :namespace "claude_tunnel::config::AppConfig", :complexity 4, :coverage 85.7143, :crap 4.0466}
   {:name "parse_section", :namespace "claude_tunnel::tunnel::TunnelParser", :complexity 4, :coverage 87.5, :crap 4.0312}
   {:name "finish", :namespace "claude_tunnel::tunnel::TunnelParser", :complexity 4, :coverage 93.75, :crap 4.0039}
+  {:name "browser_url", :namespace "claude_tunnel", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "run_root", :namespace "claude_tunnel", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "validate_browser_url", :namespace "claude_tunnel", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "write_environment_entries", :namespace "claude_tunnel", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "parse_environment", :namespace "claude_tunnel::root", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "parse_endpoint", :namespace "claude_tunnel::tunnel", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "validate_directive", :namespace "claude_tunnel::tunnel::TunnelParser", :complexity 4, :coverage 100.0, :crap 4.0}
@@ -30,9 +35,9 @@
   {:name "prepare_tray", :namespace "claude_tunnel", :complexity 3, :coverage 94.4444, :crap 3.0015}
   {:name "dispatch", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "exit_code", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "merge_environment", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "merge_status", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "privileged_output", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "write_environment_entries", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "pixel", :namespace "claude_tunnel::icon", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "status_icon", :namespace "claude_tunnel::icon", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "validate_private_file", :namespace "claude_tunnel::root", :complexity 3, :coverage 100.0, :crap 3.0}
@@ -53,6 +58,7 @@
   {:name "main", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "numeric_id", :namespace "claude_tunnel", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "prepare_launch", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
+  {:name "protected_browser_environment", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "resolve_program", :namespace "claude_tunnel", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "run", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "write_environment_request", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
@@ -115,6 +121,7 @@
   {:name "command", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "display_command", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "is_up", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "namespace_cleanup_commands", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "open_private_file", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "require_root", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "run_checked", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}

@@ -31,8 +31,9 @@
           nativeBuildInputs = [ pkgs.makeWrapper pkgs.pkg-config ];
           buildInputs = [ pkgs.dbus ];
           postInstall = ''
+            mkdir -p $out/libexec/claude-tunnel-openers
             wrapProgram $out/bin/claude-tunnel \
-              --prefix PATH : ${pkgs.lib.makeBinPath [
+              --prefix PATH : $out/libexec/claude-tunnel-openers:${pkgs.lib.makeBinPath [
                 pkgs.amneziawg-tools
                 pkgs.chromium
                 pkgs.iproute2
@@ -41,6 +42,10 @@
                 pkgs.util-linux
                 pkgs.wireguard-tools
               ]}
+            makeWrapper $out/bin/claude-tunnel $out/bin/claude-tunnel-browser-opener \
+              --add-flags __open-url
+            makeWrapper $out/bin/claude-tunnel $out/libexec/claude-tunnel-openers/xdg-open \
+              --add-flags __open-url
           '';
         };
 

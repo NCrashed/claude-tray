@@ -14,7 +14,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::process::{Command as StdCommand, ExitCode};
+use std::process::{Command as StdCommand, ExitCode, Stdio};
 use std::time::Duration;
 use tokio::process::Command;
 use tokio::sync::mpsc;
@@ -44,9 +44,14 @@ enum CliCommand {
         arguments: Vec<OsString>,
     },
     /// Open a dedicated Chromium profile inside the protected namespace.
-    Browser,
+    Browser {
+        #[arg(last = true)]
+        arguments: Vec<OsString>,
+    },
     /// Print whether Claude Code has a usable tunnel.
     Status,
+    #[command(name = "__open-url", hide = true)]
+    OpenUrl { url: OsString },
     #[command(name = "__root", hide = true)]
     Root {
         #[command(subcommand)]
@@ -109,7 +114,8 @@ async fn dispatch_user(command: CliCommand) -> Result<u8, String> {
     match command {
         CliCommand::Tray => run_tray_command().await,
         CliCommand::Run { arguments } => run_claude_command(&arguments),
-        CliCommand::Browser => run_browser_command(),
+        CliCommand::Browser { arguments } => run_browser_command(&arguments),
+        CliCommand::OpenUrl { url } => spawn_protected_browser(&url),
         CliCommand::Status => report_status(),
         CliCommand::Root { .. } => Err("root command crossed the user dispatch boundary".into()),
     }
@@ -119,8 +125,23 @@ fn run_claude_command(arguments: &[OsString]) -> Result<u8, String> {
     AppConfig::load().and_then(|config| run_claude(&config, arguments))
 }
 
-fn run_browser_command() -> Result<u8, String> {
-    AppConfig::load().and_then(|config| run_browser(&config))
+fn run_browser_command(arguments: &[OsString]) -> Result<u8, String> {
+    browser_url(arguments)
+        .and_then(|url| AppConfig::load().and_then(|config| run_browser(&config, &url)))
+}
+
+fn spawn_protected_browser(url: &OsStr) -> Result<u8, String> {
+    let url = validate_browser_url(url)?;
+    StdCommand::new(executable::installed()?)
+        .arg("browser")
+        .arg("--")
+        .arg(url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| SUCCESS)
+        .map_err(|error| format!("cannot launch protected browser opener: {error}"))
 }
 
 fn report_status() -> Result<u8, String> {
@@ -266,7 +287,7 @@ impl ActionRuntime for DesktopRuntime {
     fn open_browser(&self) {
         let config = self.config.clone();
         tokio::task::spawn_blocking(move || {
-            if let Err(message) = run_browser(&config) {
+            if let Err(message) = run_browser(&config, "https://claude.ai/login") {
                 error!("{message}");
             }
         });
@@ -354,15 +375,16 @@ fn privileged_output(output: std::process::Output) -> Result<(), String> {
 
 fn run_claude(config: &AppConfig, arguments: &[OsString]) -> Result<u8, String> {
     ensure_tunnel_available()
-        .and_then(|()| prepare_launch(&config.claude_binary))
+        .and_then(|()| protected_browser_environment())
+        .and_then(|environment| prepare_launch(&config.claude_binary, &environment))
         .and_then(|launch| execute_protected(launch, arguments))
 }
 
-fn run_browser(config: &AppConfig) -> Result<u8, String> {
+fn run_browser(config: &AppConfig, url: &str) -> Result<u8, String> {
     ensure_tunnel_available()
         .and_then(|()| create_browser_profile(&config.browser_profile_dir))
-        .and_then(|()| prepare_launch(&config.browser_binary))
-        .and_then(|launch| execute_protected(launch, &browser_arguments(config)))
+        .and_then(|()| prepare_launch(&config.browser_binary, &[]))
+        .and_then(|launch| execute_protected(launch, &browser_arguments(config, url)))
 }
 
 fn create_browser_profile(path: &Path) -> Result<(), String> {
@@ -370,15 +392,43 @@ fn create_browser_profile(path: &Path) -> Result<(), String> {
         .map_err(|error| format!("cannot create browser profile {}: {error}", path.display()))
 }
 
-fn browser_arguments(config: &AppConfig) -> [OsString; 4] {
+fn browser_arguments(config: &AppConfig, url: &str) -> [OsString; 4] {
     let mut profile = OsString::from("--user-data-dir=");
     profile.push(&config.browser_profile_dir);
     [
         profile,
         OsString::from("--no-first-run"),
         OsString::from("--new-window"),
-        OsString::from("https://claude.ai/login"),
+        OsString::from(url),
     ]
+}
+
+fn browser_url(arguments: &[OsString]) -> Result<String, String> {
+    match arguments {
+        [] => Ok("https://claude.ai/login".into()),
+        [url] => validate_browser_url(url),
+        _ => Err("browser accepts at most one URL".into()),
+    }
+}
+
+fn validate_browser_url(url: &OsStr) -> Result<String, String> {
+    let url = url
+        .to_str()
+        .ok_or_else(|| "browser URL is not valid UTF-8".to_string())?;
+    ((url.starts_with("https://") || url.starts_with("http://"))
+        && !url.chars().any(char::is_control))
+    .then(|| url.to_string())
+    .ok_or_else(|| "browser opener only accepts http:// or https:// URLs".into())
+}
+
+fn protected_browser_environment() -> Result<Vec<(String, String)>, String> {
+    executable::browser_opener().and_then(|opener| {
+        opener
+            .into_os_string()
+            .into_string()
+            .map(|path| vec![("BROWSER".into(), path)])
+            .map_err(|_| "protected browser opener path is not valid UTF-8".into())
+    })
 }
 
 fn ensure_tunnel_available() -> Result<(), String> {
@@ -396,11 +446,11 @@ struct Launch {
     gid: u32,
 }
 
-fn prepare_launch(program: &Path) -> Result<Launch, String> {
+fn prepare_launch(program: &Path, environment: &[(String, String)]) -> Result<Launch, String> {
     resolve_program(program).and_then(|program| {
         numeric_id("-u").and_then(|uid| {
             numeric_id("-g").and_then(|gid| {
-                launch_paths(uid).map(|(executable, environment_file, cwd)| Launch {
+                launch_paths(uid, environment).map(|(executable, environment_file, cwd)| Launch {
                     executable,
                     program,
                     environment_file,
@@ -413,11 +463,14 @@ fn prepare_launch(program: &Path) -> Result<Launch, String> {
     })
 }
 
-fn launch_paths(uid: u32) -> Result<(PathBuf, PathBuf, PathBuf), String> {
+fn launch_paths(
+    uid: u32,
+    environment: &[(String, String)],
+) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     std::env::current_dir()
         .map_err(|error| format!("cannot read cwd: {error}"))
         .and_then(|cwd| {
-            write_environment_request(uid).and_then(|environment_file| {
+            write_environment_request(uid, environment).and_then(|environment_file| {
                 executable::installed().map(|executable| (executable, environment_file, cwd))
             })
         })
@@ -470,14 +523,20 @@ fn resolve_program(program: &Path) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("cannot find {} in PATH", program.display()))
 }
 
-fn write_environment_request(uid: u32) -> Result<PathBuf, String> {
+fn write_environment_request(
+    uid: u32,
+    environment: &[(String, String)],
+) -> Result<PathBuf, String> {
     let directory = PathBuf::from(format!("/run/user/{uid}/claude-tunnel"));
     std::fs::create_dir_all(&directory)
         .map_err(|error| format!("cannot create {}: {error}", directory.display()))
-        .and_then(|()| create_environment_file(&directory))
+        .and_then(|()| create_environment_file(&directory, environment))
 }
 
-fn create_environment_file(directory: &Path) -> Result<PathBuf, String> {
+fn create_environment_file(
+    directory: &Path,
+    environment: &[(String, String)],
+) -> Result<PathBuf, String> {
     let path = directory.join(format!("env-{}", std::process::id()));
     OpenOptions::new()
         .write(true)
@@ -485,12 +544,16 @@ fn create_environment_file(directory: &Path) -> Result<PathBuf, String> {
         .mode(0o600)
         .open(&path)
         .map_err(|error| format!("cannot create environment request: {error}"))
-        .and_then(|mut file| write_environment_entries(&mut file))
+        .and_then(|mut file| write_environment_entries(&mut file, environment))
         .map(|()| path)
 }
 
-fn write_environment_entries(file: &mut std::fs::File) -> Result<(), String> {
-    for (key, value) in std::env::vars().filter(|(key, _)| root::allowed_environment_key(key)) {
+fn write_environment_entries(
+    file: &mut std::fs::File,
+    overrides: &[(String, String)],
+) -> Result<(), String> {
+    let environment = merge_environment(std::env::vars(), overrides)?;
+    for (key, value) in environment {
         file.write_all(key.as_bytes())
             .and_then(|()| file.write_all(b"="))
             .and_then(|()| file.write_all(value.as_bytes()))
@@ -499,6 +562,25 @@ fn write_environment_entries(file: &mut std::fs::File) -> Result<(), String> {
     }
     info!("prepared protected Claude environment");
     Ok(())
+}
+
+fn merge_environment(
+    inherited: impl IntoIterator<Item = (String, String)>,
+    overrides: &[(String, String)],
+) -> Result<Vec<(String, String)>, String> {
+    if let Some((key, _)) = overrides
+        .iter()
+        .find(|(key, _)| !root::allowed_environment_key(key))
+    {
+        return Err(format!("environment variable {key} is not allowed"));
+    }
+    Ok(inherited
+        .into_iter()
+        .filter(|(key, _)| {
+            root::allowed_environment_key(key) && !overrides.iter().any(|(name, _)| name == key)
+        })
+        .chain(overrides.iter().cloned())
+        .collect())
 }
 
 #[cfg(test)]
@@ -510,7 +592,7 @@ mod tests {
         if !root::is_up() {
             assert_eq!(detect_status(Path::new("/missing")), Status::Disconnected);
             assert!(run_claude(&AppConfig::default(), &[]).is_err());
-            assert!(run_browser(&AppConfig::default()).is_err());
+            assert!(run_browser(&AppConfig::default(), "https://claude.ai/login").is_err());
         }
     }
 
@@ -540,10 +622,32 @@ mod tests {
             .create_new(true)
             .open(&path)
             .unwrap();
-        write_environment_entries(&mut file).unwrap();
+        let overrides = [("BROWSER".into(), "/protected/opener".into())];
+        write_environment_entries(&mut file, &overrides).unwrap();
         let bytes = std::fs::read(path).unwrap();
         assert!(!bytes.is_empty());
         assert_eq!(bytes.last(), Some(&0));
+        assert!(bytes
+            .windows(b"BROWSER=/protected/opener\0".len())
+            .any(|window| window == b"BROWSER=/protected/opener\0"));
+
+        let merged = merge_environment(
+            [
+                ("HOME".into(), "/home/user".into()),
+                ("BROWSER".into(), "/system/opener".into()),
+                ("LD_PRELOAD".into(), "evil".into()),
+            ],
+            &overrides,
+        )
+        .unwrap();
+        assert_eq!(
+            merged,
+            [
+                ("HOME".into(), "/home/user".into()),
+                ("BROWSER".into(), "/protected/opener".into()),
+            ]
+        );
+        assert!(merge_environment([], &[("LD_PRELOAD".into(), "evil".into())]).is_err());
     }
 
     #[test]
@@ -579,8 +683,15 @@ mod tests {
             assert!(dispatch(CliCommand::Run { arguments: vec![] })
                 .await
                 .is_err());
-            assert!(dispatch(CliCommand::Browser).await.is_err());
+            assert!(dispatch(CliCommand::Browser { arguments: vec![] })
+                .await
+                .is_err());
         }
+        assert!(dispatch(CliCommand::OpenUrl {
+            url: OsString::from("file:///tmp/private")
+        })
+        .await
+        .is_err());
     }
 
     #[test]
@@ -693,13 +804,23 @@ mod tests {
         };
 
         assert_eq!(
-            browser_arguments(&config),
+            browser_arguments(&config, "https://console.anthropic.com/oauth"),
             [
                 OsString::from("--user-data-dir=/tmp/claude-browser"),
                 OsString::from("--no-first-run"),
                 OsString::from("--new-window"),
-                OsString::from("https://claude.ai/login"),
+                OsString::from("https://console.anthropic.com/oauth"),
             ]
+        );
+        assert_eq!(browser_url(&[]).unwrap(), "https://claude.ai/login");
+        assert_eq!(
+            browser_url(&[OsString::from("http://127.0.0.1/callback")]).unwrap(),
+            "http://127.0.0.1/callback"
+        );
+        assert!(browser_url(&[OsString::from("file:///tmp/private")]).is_err());
+        assert!(browser_url(&[OsString::from("--proxy-server=direct://")]).is_err());
+        assert!(
+            browser_url(&[OsString::from("https://one"), OsString::from("https://two")]).is_err()
         );
     }
 }

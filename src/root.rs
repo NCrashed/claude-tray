@@ -232,6 +232,7 @@ pub fn allowed_environment_key(key: &str) -> bool {
             | "XAUTHORITY"
             | "DBUS_SESSION_BUS_ADDRESS"
             | "DESKTOP_STARTUP_ID"
+            | "BROWSER"
             | "SSH_AUTH_SOCK"
             | "SSL_CERT_FILE"
             | "SSL_CERT_DIR"
@@ -331,13 +332,9 @@ fn down_internal() {
         .into_iter()
         .flat_map(cleanup_firewall_commands)
         .for_each(|command| run_ignoring_status(&command));
-    run_ignoring_status(&CommandSpec {
-        program: "ip",
-        args: ["netns", "delete", NAMESPACE]
-            .into_iter()
-            .map(str::to_owned)
-            .collect(),
-    });
+    namespace_cleanup_commands()
+        .iter()
+        .for_each(run_ignoring_status);
     for path in [
         RUNTIME_CONFIG,
         ENDPOINT_STATE,
@@ -346,6 +343,13 @@ fn down_internal() {
         let _ = std::fs::remove_file(path);
     }
     let _ = std::fs::remove_dir(NETNS_ETC);
+}
+
+fn namespace_cleanup_commands() -> [CommandSpec; 2] {
+    [
+        command("ip", &["netns", "delete", NAMESPACE]),
+        command("ip", &["link", "delete", HOST_VETH]),
+    ]
 }
 
 fn cleanup_firewall_commands(endpoint: SocketAddrV4) -> Vec<CommandSpec> {
@@ -455,10 +459,19 @@ mod tests {
     }
 
     #[test]
+    fn cleanup_removes_an_orphaned_host_veth_after_a_partial_setup() {
+        let commands = namespace_cleanup_commands();
+
+        assert_eq!(commands[0], command("ip", &["netns", "delete", NAMESPACE]));
+        assert_eq!(commands[1], command("ip", &["link", "delete", HOST_VETH]));
+    }
+
+    #[test]
     fn environment_allowlist_keeps_credentials_but_rejects_loader_injection() {
         assert!(allowed_environment_key("ANTHROPIC_API_KEY"));
         assert!(allowed_environment_key("CLAUDE_CODE_USE_BEDROCK"));
         assert!(allowed_environment_key("XDG_RUNTIME_DIR"));
+        assert!(allowed_environment_key("BROWSER"));
         for key in [
             "DISPLAY",
             "WAYLAND_DISPLAY",
