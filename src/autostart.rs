@@ -16,12 +16,18 @@ pub fn set_enabled(enabled: bool) -> Result<(), String> {
 
 fn set_enabled_at(path: &std::path::Path, enabled: bool) -> Result<(), String> {
     if enabled {
-        std::env::current_exe()
-            .map_err(|error| format!("cannot locate current executable: {error}"))
-            .and_then(|executable| enable_at(path, &executable))
+        autostart_executable().and_then(|executable| enable_at(path, &executable))
     } else {
         disable_at(path)
     }
+}
+
+fn autostart_executable() -> Result<PathBuf, String> {
+    let profile_binary = dirs::home_dir().map(|home| home.join(".nix-profile/bin/claude-tunnel"));
+    if let Some(binary) = profile_binary.filter(|path| path.is_file()) {
+        return Ok(binary);
+    }
+    std::env::current_exe().map_err(|error| format!("cannot locate current executable: {error}"))
 }
 
 fn enable_at(path: &std::path::Path, executable: &std::path::Path) -> Result<(), String> {
@@ -64,5 +70,15 @@ mod tests {
         disable_at(&path).unwrap();
         disable_at(&path).unwrap();
         set_enabled_at(&path, false).unwrap();
+    }
+
+    #[test]
+    fn installed_profile_binary_is_stable_across_nix_store_updates() {
+        if let Some(home) = dirs::home_dir() {
+            let expected = home.join(".nix-profile/bin/claude-tunnel");
+            if expected.is_file() {
+                assert_eq!(autostart_executable().unwrap(), expected);
+            }
+        }
     }
 }

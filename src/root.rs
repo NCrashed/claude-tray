@@ -56,6 +56,23 @@ fn run_setup_plan(endpoint: SocketAddrV4) -> Result<(), String> {
 }
 
 pub fn is_up() -> bool {
+    // SAFETY: geteuid has no preconditions and only reads process credentials.
+    let effective_uid = unsafe { libc::geteuid() };
+    is_up_for(effective_uid, active_endpoint().is_some(), interface_is_up)
+}
+
+fn is_up_for<F>(effective_uid: u32, has_root_state: bool, probe_interface: F) -> bool
+where
+    F: FnOnce() -> bool,
+{
+    if effective_uid == ROOT_UID {
+        probe_interface()
+    } else {
+        has_root_state
+    }
+}
+
+fn interface_is_up() -> bool {
     Command::new("ip")
         .args([
             "netns",
@@ -491,5 +508,13 @@ mod tests {
     fn checked_commands_report_success_and_stderr() {
         assert!(run_checked(&command("true", &[])).is_ok());
         assert!(run_checked(&command("false", &[])).is_err());
+    }
+
+    #[test]
+    fn unprivileged_status_uses_root_owned_state_but_root_probes_the_interface() {
+        assert!(is_up_for(1000, true, || false));
+        assert!(!is_up_for(1000, false, || true));
+        assert!(is_up_for(ROOT_UID, false, || true));
+        assert!(!is_up_for(ROOT_UID, true, || false));
     }
 }

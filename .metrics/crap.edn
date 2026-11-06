@@ -11,7 +11,6 @@
   {:name "run_tray_command", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "open_browser", :namespace "claude_tunnel::DesktopRuntime", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "is_claude_mark", :namespace "claude_tunnel::icon", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "active_endpoint", :namespace "claude_tunnel::root", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "allowed_environment_key", :namespace "claude_tunnel::root", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "down_internal", :namespace "claude_tunnel::root", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "parse_sudo_id", :namespace "claude_tunnel::root", :complexity 2, :coverage 0.0, :crap 6.0}
@@ -40,8 +39,10 @@
   {:name "active_name", :namespace "claude_tunnel::status::Status", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "validate", :namespace "claude_tunnel::tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "parse_dns", :namespace "claude_tunnel::tunnel::TunnelParser", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "set_enabled_at", :namespace "claude_tunnel::autostart", :complexity 2, :coverage 57.1429, :crap 2.3149}
+  {:name "active_endpoint", :namespace "claude_tunnel::root", :complexity 2, :coverage 57.1429, :crap 2.3149}
   {:name "report_status", :namespace "claude_tunnel", :complexity 2, :coverage 71.4286, :crap 2.0933}
+  {:name "autostart_executable", :namespace "claude_tunnel::autostart", :complexity 2, :coverage 71.4286, :crap 2.0933}
+  {:name "set_enabled_at", :namespace "claude_tunnel::autostart", :complexity 2, :coverage 80.0, :crap 2.032}
   {:name "create_browser_profile", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "create_environment_file", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "execute_protected", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
@@ -64,6 +65,8 @@
   {:name "create_runtime_dir", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "ensure_tunnel_up", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "evaluate_output", :namespace "claude_tunnel::root", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "interface_is_up", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
+  {:name "is_up_for", :namespace "claude_tunnel::root", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "namespace_command", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "read_environment_bytes", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "read_environment_file", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}

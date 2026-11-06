@@ -1,5 +1,5 @@
 use crate::status::Status;
-use crate::{autostart, icon, root, tunnel};
+use crate::{autostart, icon, tunnel};
 use ksni::menu::{CheckmarkItem, RadioGroup, RadioItem, StandardItem};
 use std::path::PathBuf;
 use tokio::sync::mpsc;
@@ -86,7 +86,7 @@ impl ksni::Tray for ClaudeTray {
             );
         }
 
-        if root::is_up() {
+        if matches!(self.status, Status::Connected(_)) {
             items.push(
                 StandardItem {
                     label: "Открыть браузер".into(),
