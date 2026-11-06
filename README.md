@@ -91,6 +91,22 @@ chmod 0755 ~/.local/bin/claude
 В `config.toml` при этом обязательно оставьте абсолютный путь к настоящему
 Claude Code, иначе получится рекурсия wrapper-а.
 
+## HBS2
+
+Публичное зеркало и децентрализованный hub доступны по адресу:
+
+```text
+hbs23://HGx6vZBNnC54T57VULJKb4bZYuxUa5qUkrYxFZpgA7VZ
+```
+
+Клонирование и синхронизация:
+
+```sh
+git clone hbs23://HGx6vZBNnC54T57VULJKb4bZYuxUa5qUkrYxFZpgA7VZ claude-tunnel
+hbs2-hub sync
+hbs2-hub status
+```
+
 ## Разработка и проверки
 
 ```sh
