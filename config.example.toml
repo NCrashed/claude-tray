@@ -1,0 +1,11 @@
+# Directory containing one or more WireGuard/AmneziaWG .conf files.
+tunnels_dir = "/home/user/.config/claude-tunnel/tunnels"
+
+# The real Claude Code executable, not a shell alias or wrapper.
+claude_binary = "/run/current-system/sw/bin/claude"
+
+# Chromium is started with an isolated profile in the same network namespace.
+browser_binary = "chromium"
+browser_profile_dir = "/home/user/.local/share/claude-tunnel/chromium-profile"
+
+poll_interval_secs = 3

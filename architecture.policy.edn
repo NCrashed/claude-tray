@@ -1,0 +1,7 @@
+{:title "Claude Tunnel"
+ :prefix "claude_tunnel"
+ :lang :rust
+ :src "src"
+ :foreign [async_trait clap dirs fs2 ksni libc serde std tempfile tokio toml tracing tracing_subscriber]
+ :hierarchical true
+ :order [tunnel network root config status icon tray autostart main]}
