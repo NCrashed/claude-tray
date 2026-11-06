@@ -392,23 +392,132 @@ fn run_claude(config: &AppConfig, arguments: &[OsString]) -> Result<u8, String> 
 
 fn run_browser(config: &AppConfig, url: &str) -> Result<u8, String> {
     ensure_tunnel_available()
-        .and_then(|()| create_browser_profile(&config.browser_profile_dir))
-        .and_then(|()| prepare_launch(&config.browser_binary, &protected_timezone_environment()))
+        .and_then(|()| prepare_browser_profile(&config.browser_profile_dir))
+        .and_then(|()| prepare_launch(&config.browser_binary, &protected_privacy_environment()))
         .and_then(|launch| execute_protected(launch, &browser_arguments(config, url)))
 }
 
-fn create_browser_profile(path: &Path) -> Result<(), String> {
+fn prepare_browser_profile(path: &Path) -> Result<(), String> {
     std::fs::create_dir_all(path)
         .map_err(|error| format!("cannot create browser profile {}: {error}", path.display()))
+        .and_then(|()| {
+            if browser_language_is_normalized(path)? {
+                Ok(())
+            } else {
+                ensure_browser_profile_is_closed(path)
+                    .and_then(|()| normalize_browser_language(path))
+            }
+        })
 }
 
-fn browser_arguments(config: &AppConfig, url: &str) -> [OsString; 4] {
+fn ensure_browser_profile_is_closed(path: &Path) -> Result<(), String> {
+    path.join("SingletonLock")
+        .symlink_metadata()
+        .is_err()
+        .then_some(())
+        .ok_or_else(|| {
+            "protected Chromium is already running; close it before opening a private login window"
+                .into()
+        })
+}
+
+fn normalize_browser_language(profile: &Path) -> Result<(), String> {
+    let preferences = profile.join("Default/Preferences");
+    let defaults = preferences
+        .parent()
+        .ok_or_else(|| "Chromium preferences have no parent directory".to_string())?;
+    std::fs::create_dir_all(defaults)
+        .map_err(|error| format!("cannot create Chromium profile defaults: {error}"))?;
+    let permissions = std::fs::metadata(&preferences)
+        .ok()
+        .map(|metadata| metadata.permissions());
+    let mut value =
+        read_browser_preferences(&preferences)?.unwrap_or_else(|| serde_json::json!({}));
+    set_browser_languages(&mut value)?;
+    let encoded = serde_json::to_vec(&value)
+        .map_err(|error| format!("cannot encode Chromium preferences: {error}"))?;
+    install_browser_preferences(&preferences, &encoded, permissions)
+}
+
+fn set_browser_languages(value: &mut serde_json::Value) -> Result<(), String> {
+    let root = value
+        .as_object_mut()
+        .ok_or_else(|| "Chromium preferences must be a JSON object".to_string())?;
+    let intl = root
+        .entry("intl")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .ok_or_else(|| "Chromium intl preferences must be a JSON object".to_string())?;
+    for key in ["selected_languages", "accept_languages"] {
+        intl.insert(key.into(), serde_json::Value::String("en-US,en".into()));
+    }
+    Ok(())
+}
+
+fn install_browser_preferences(
+    preferences: &Path,
+    encoded: &[u8],
+    permissions: Option<std::fs::Permissions>,
+) -> Result<(), String> {
+    let temporary = preferences.with_file_name(format!(
+        "Preferences.claude-tunnel-{}.tmp",
+        std::process::id()
+    ));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&temporary)
+        .map_err(|error| format!("cannot create Chromium preferences update: {error}"))?;
+    file.write_all(encoded)
+        .and_then(|()| file.sync_all())
+        .map_err(|error| format!("cannot write Chromium preferences update: {error}"))?;
+    if let Some(permissions) = permissions {
+        std::fs::set_permissions(&temporary, permissions)
+            .map_err(|error| format!("cannot protect Chromium preferences update: {error}"))?;
+    }
+    std::fs::rename(&temporary, preferences)
+        .map_err(|error| format!("cannot install Chromium preferences update: {error}"))
+}
+
+fn browser_language_is_normalized(profile: &Path) -> Result<bool, String> {
+    let preferences = profile.join("Default/Preferences");
+    read_browser_preferences(&preferences).map(|value| {
+        value.is_some_and(|value| {
+            ["selected_languages", "accept_languages"]
+                .iter()
+                .all(|key| value["intl"][key].as_str() == Some("en-US,en"))
+        })
+    })
+}
+
+fn read_browser_preferences(path: &Path) -> Result<Option<serde_json::Value>, String> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let bytes = std::fs::read(path)
+        .map_err(|error| format!("cannot read Chromium preferences: {error}"))?;
+    serde_json::from_slice(&bytes)
+        .map(Some)
+        .map_err(|error| format!("cannot parse Chromium preferences: {error}"))
+}
+
+fn browser_arguments(config: &AppConfig, url: &str) -> Vec<OsString> {
     let mut profile = OsString::from("--user-data-dir=");
     profile.push(&config.browser_profile_dir);
-    [
+    vec![
         profile,
+        OsString::from("--lang=en-US"),
+        OsString::from("--disable-background-networking"),
+        OsString::from("--disable-component-update"),
+        OsString::from("--disable-default-apps"),
+        OsString::from("--disable-sync"),
+        OsString::from("--deny-permission-prompts"),
+        OsString::from("--force-webrtc-ip-handling-policy=disable_non_proxied_udp"),
+        OsString::from("--no-default-browser-check"),
         OsString::from("--no-first-run"),
         OsString::from("--new-window"),
+        OsString::from("--window-size=1280,900"),
         OsString::from(url),
     ]
 }
@@ -431,8 +540,12 @@ fn validate_browser_url(url: &OsStr) -> Result<String, String> {
     .ok_or_else(|| "browser opener only accepts http:// or https:// URLs".into())
 }
 
-fn protected_timezone_environment() -> Vec<(String, String)> {
-    vec![("TZ".into(), "UTC".into())]
+fn protected_privacy_environment() -> Vec<(String, String)> {
+    vec![
+        ("TZ".into(), "UTC".into()),
+        ("LANG".into(), "C.UTF-8".into()),
+        ("LC_ALL".into(), "C.UTF-8".into()),
+    ]
 }
 
 fn protected_claude_environment() -> Result<Vec<(String, String)>, String> {
@@ -446,8 +559,12 @@ fn protected_claude_environment() -> Result<Vec<(String, String)>, String> {
 }
 
 fn protected_claude_environment_with(browser_opener: String) -> Vec<(String, String)> {
-    let mut environment = protected_timezone_environment();
+    let mut environment = protected_privacy_environment();
     environment.push(("BROWSER".into(), browser_opener));
+    environment.push((
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC".into(),
+        "1".into(),
+    ));
     environment
 }
 
@@ -860,15 +977,23 @@ AllowedIPs = 0.0.0.0/0
             ..AppConfig::default()
         };
 
-        assert_eq!(
-            browser_arguments(&config, "https://console.anthropic.com/oauth"),
-            [
-                OsString::from("--user-data-dir=/tmp/claude-browser"),
-                OsString::from("--no-first-run"),
-                OsString::from("--new-window"),
-                OsString::from("https://console.anthropic.com/oauth"),
-            ]
-        );
+        let arguments = browser_arguments(&config, "https://console.anthropic.com/oauth");
+        for expected in [
+            "--user-data-dir=/tmp/claude-browser",
+            "--lang=en-US",
+            "--disable-background-networking",
+            "--disable-component-update",
+            "--disable-sync",
+            "--deny-permission-prompts",
+            "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+            "--window-size=1280,900",
+            "https://console.anthropic.com/oauth",
+        ] {
+            assert!(
+                arguments.contains(&OsString::from(expected)),
+                "missing {expected}"
+            );
+        }
         assert_eq!(browser_url(&[]).unwrap(), "https://claude.ai/login");
         assert_eq!(
             browser_url(&[OsString::from("http://127.0.0.1/callback")]).unwrap(),
@@ -882,14 +1007,57 @@ AllowedIPs = 0.0.0.0/0
     }
 
     #[test]
-    fn protected_processes_always_use_utc() {
-        assert_eq!(
-            protected_timezone_environment(),
-            vec![("TZ".to_string(), "UTC".to_string())]
-        );
-        assert!(
-            protected_claude_environment_with("/protected/opener".into())
-                .contains(&("TZ".to_string(), "UTC".to_string()))
-        );
+    fn browser_profile_language_is_normalized_without_replacing_other_preferences() {
+        let dir = tempfile::tempdir().unwrap();
+        let default = dir.path().join("Default");
+        std::fs::create_dir_all(&default).unwrap();
+        let preferences = default.join("Preferences");
+        std::fs::write(
+            &preferences,
+            r#"{"intl":{"selected_languages":"ru-RU,ru,en-US,en"},"preserved":true}"#,
+        )
+        .unwrap();
+
+        normalize_browser_language(dir.path()).unwrap();
+
+        let value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(preferences).unwrap()).unwrap();
+        assert_eq!(value["intl"]["selected_languages"], "en-US,en");
+        assert_eq!(value["intl"]["accept_languages"], "en-US,en");
+        assert_eq!(value["preserved"], true);
+    }
+
+    #[test]
+    fn browser_profile_must_not_be_running_when_privacy_settings_change() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("SingletonLock"), "active").unwrap();
+
+        assert!(prepare_browser_profile(dir.path()).is_err());
+    }
+
+    #[test]
+    fn normalized_running_browser_can_receive_another_login_url() {
+        let dir = tempfile::tempdir().unwrap();
+        normalize_browser_language(dir.path()).unwrap();
+        std::fs::write(dir.path().join("SingletonLock"), "active").unwrap();
+
+        assert!(prepare_browser_profile(dir.path()).is_ok());
+    }
+
+    #[test]
+    fn protected_processes_hide_regional_environment() {
+        let environment = protected_privacy_environment();
+        assert!(environment.contains(&("TZ".to_string(), "UTC".to_string())));
+        assert!(environment.contains(&("LANG".to_string(), "C.UTF-8".to_string())));
+        assert!(environment.contains(&("LC_ALL".to_string(), "C.UTF-8".to_string())));
+    }
+
+    #[test]
+    fn claude_disables_nonessential_network_traffic() {
+        let environment = protected_claude_environment_with("/protected/opener".into());
+        assert!(environment.contains(&(
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC".to_string(),
+            "1".to_string(),
+        )));
     }
 }
