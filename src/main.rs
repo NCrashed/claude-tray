@@ -1,4 +1,5 @@
 mod autostart;
+mod executable;
 mod icon;
 mod status;
 mod tray;
@@ -322,8 +323,7 @@ fn detect_status(tunnels_dir: &Path) -> Status {
 }
 
 async fn privileged(arguments: &[&OsStr]) -> Result<(), String> {
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("cannot locate current executable: {error}"))?;
+    let executable = executable::installed()?;
     invoke_privileged(executable, arguments).await
 }
 
@@ -418,9 +418,7 @@ fn launch_paths(uid: u32) -> Result<(PathBuf, PathBuf, PathBuf), String> {
         .map_err(|error| format!("cannot read cwd: {error}"))
         .and_then(|cwd| {
             write_environment_request(uid).and_then(|environment_file| {
-                std::env::current_exe()
-                    .map(|executable| (executable, environment_file, cwd))
-                    .map_err(|error| format!("cannot locate current executable: {error}"))
+                executable::installed().map(|executable| (executable, environment_file, cwd))
             })
         })
 }
@@ -533,6 +531,7 @@ mod tests {
         assert!(resolve_program(&std::env::current_exe().unwrap()).is_ok());
         assert!(resolve_program(Path::new("true")).is_ok());
         assert!(resolve_program(Path::new("certainly-not-a-real-command")).is_err());
+        assert!(executable::installed().unwrap().is_file());
 
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("environment");

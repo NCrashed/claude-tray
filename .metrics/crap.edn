@@ -41,7 +41,7 @@
   {:name "parse_dns", :namespace "claude_tunnel::tunnel::TunnelParser", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "active_endpoint", :namespace "claude_tunnel::root", :complexity 2, :coverage 57.1429, :crap 2.3149}
   {:name "report_status", :namespace "claude_tunnel", :complexity 2, :coverage 71.4286, :crap 2.0933}
-  {:name "autostart_executable", :namespace "claude_tunnel::autostart", :complexity 2, :coverage 71.4286, :crap 2.0933}
+  {:name "installed", :namespace "claude_tunnel::executable", :complexity 2, :coverage 71.4286, :crap 2.0933}
   {:name "set_enabled_at", :namespace "claude_tunnel::autostart", :complexity 2, :coverage 80.0, :crap 2.032}
   {:name "create_browser_profile", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "create_environment_file", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
