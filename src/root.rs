@@ -55,10 +55,14 @@ pub fn steam_bridge_down() -> Result<(), String> {
 }
 
 pub fn steam_bridge_is_up() -> bool {
-    is_up()
-        && std::fs::read_to_string(STEAM_BRIDGE_STATE)
-            .ok()
-            .is_some_and(|state| steam_bridge_state_is_live(&state, process_exists))
+    let state_is_live = std::fs::read_to_string(STEAM_BRIDGE_STATE)
+        .ok()
+        .is_some_and(|state| steam_bridge_state_is_live(&state, process_exists));
+    steam_bridge_available(is_up(), state_is_live)
+}
+
+fn steam_bridge_available(tunnel_is_up: bool, state_is_live: bool) -> bool {
+    tunnel_is_up && state_is_live
 }
 
 fn replace_steam_bridge(uid: u32) -> Result<(), String> {
@@ -119,12 +123,10 @@ fn discover_steam_loopback_ports(proc_root: &Path, uid: u32) -> Result<Vec<u16>,
     let mut ports = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
-        if entry.file_name().to_string_lossy().parse::<u32>().is_err()
-            || !entry.metadata().is_ok_and(|metadata| metadata.uid() == uid)
-            || std::fs::read_to_string(path.join("comm"))
-                .map(|comm| comm.trim() != "steam")
-                .unwrap_or(true)
-        {
+        let name = entry.file_name();
+        let owner = entry.metadata().ok().map(|metadata| metadata.uid());
+        let comm = std::fs::read_to_string(path.join("comm")).ok();
+        if !is_user_steam_process(&name, owner, uid, comm.as_deref()) {
             continue;
         }
         let owned = owned_socket_inodes(&path.join("fd"));
@@ -135,6 +137,17 @@ fn discover_steam_loopback_ports(proc_root: &Path, uid: u32) -> Result<Vec<u16>,
     ports.sort_unstable();
     ports.dedup();
     Ok(ports)
+}
+
+fn is_user_steam_process(
+    name: &std::ffi::OsStr,
+    owner: Option<u32>,
+    uid: u32,
+    comm: Option<&str>,
+) -> bool {
+    name.to_string_lossy().parse::<u32>().is_ok()
+        && owner == Some(uid)
+        && comm.is_some_and(|value| value.trim() == "steam")
 }
 
 fn owned_socket_inodes(fd_dir: &Path) -> HashSet<u64> {
@@ -273,8 +286,12 @@ fn steam_proxy_command(in_namespace: bool, port: u16) -> Command {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .process_group(0);
+        .process_group(steam_proxy_process_group());
     command
+}
+
+fn steam_proxy_process_group() -> i32 {
+    0
 }
 
 fn write_steam_bridge_state(state: &str) -> Result<(), String> {
@@ -942,6 +959,8 @@ mod tests {
         let other = proc_root.path().join("5678");
         std::fs::create_dir_all(&other).unwrap();
         std::fs::write(other.join("comm"), "not-steam\n").unwrap();
+        std::fs::create_dir_all(proc_root.path().join("9999")).unwrap();
+        std::fs::create_dir_all(proc_root.path().join("self")).unwrap();
 
         // SAFETY: getuid has no preconditions and only reads process credentials.
         let uid = unsafe { libc::getuid() };
@@ -952,6 +971,36 @@ mod tests {
     }
 
     #[test]
+    fn steam_process_identity_requires_numeric_pid_owner_and_exact_name() {
+        let pid = std::ffi::OsStr::new("1234");
+        assert!(is_user_steam_process(
+            pid,
+            Some(1000),
+            1000,
+            Some("steam\n")
+        ));
+        assert!(!is_user_steam_process(
+            std::ffi::OsStr::new("self"),
+            Some(1000),
+            1000,
+            Some("steam\n")
+        ));
+        assert!(!is_user_steam_process(
+            pid,
+            Some(1001),
+            1000,
+            Some("steam\n")
+        ));
+        assert!(!is_user_steam_process(pid, Some(1000), 1000, None));
+        assert!(!is_user_steam_process(
+            pid,
+            Some(1000),
+            1000,
+            Some("steamwebhelper\n")
+        ));
+    }
+
+    #[test]
     fn steam_bridge_requires_at_least_one_discovered_port() {
         assert!(require_steam_ports(vec![]).is_err());
         assert_eq!(require_steam_ports(vec![46_445]).unwrap(), vec![46_445]);
@@ -959,6 +1008,7 @@ mod tests {
 
     #[test]
     fn steam_proxy_commands_bind_only_expected_bridge_addresses() {
+        assert_eq!(steam_proxy_process_group(), 0);
         let host = steam_proxy_command(false, 46_445);
         assert_eq!(host.get_program(), "socat");
         assert!(host
@@ -983,5 +1033,13 @@ mod tests {
         assert!(!steam_bridge_state_is_live(state, |pid| pid == 101));
         assert!(!steam_bridge_state_is_live("port=46445\n", |_| true));
         assert!(!steam_bridge_state_is_live("pid=101\n", |_| true));
+    }
+
+    #[test]
+    fn steam_bridge_is_available_only_with_tunnel_and_live_proxies() {
+        assert!(steam_bridge_available(true, true));
+        assert!(!steam_bridge_available(true, false));
+        assert!(!steam_bridge_available(false, true));
+        assert!(!steam_bridge_available(false, false));
     }
 }

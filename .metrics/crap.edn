@@ -1,17 +1,5 @@
 {:entries [
-  {:name "dispatch_user", :namespace "claude_tunnel", :complexity 8, :coverage 70.0, :crap 9.728}
   {:name "steam_loopback_ports", :namespace "claude_tunnel::root", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "spawn_protected_browser", :namespace "claude_tunnel", :complexity 3, :coverage 23.0769, :crap 7.0965}
-  {:name "dispatch_action", :namespace "claude_tunnel", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "discover_steam_loopback_ports", :namespace "claude_tunnel::root", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "normalize_browser_language", :namespace "claude_tunnel", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "poll_status", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
-  {:name "privileged", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
-  {:name "run_prepared_tray", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
-  {:name "run_root", :namespace "claude_tunnel", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "run_tray", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
-  {:name "run_tray_command", :namespace "claude_tunnel", :complexity 2, :coverage 0.0, :crap 6.0}
-  {:name "open_browser", :namespace "claude_tunnel::DesktopRuntime", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "allowed_environment_key", :namespace "claude_tunnel::root", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "down_internal", :namespace "claude_tunnel::root", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "ensure_firewall_rule", :namespace "claude_tunnel::root", :complexity 2, :coverage 0.0, :crap 6.0}
@@ -24,55 +12,13 @@
   {:name "spawn_steam_proxies", :namespace "claude_tunnel::root", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "stop_steam_bridge", :namespace "claude_tunnel::root", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "terminate_proxy_groups", :namespace "claude_tunnel::root", :complexity 2, :coverage 0.0, :crap 6.0}
-  {:name "menu", :namespace "claude_tunnel::tray::ClaudeTray", :complexity 4, :coverage 50.4854, :crap 5.9423}
-  {:name "install_browser_preferences", :namespace "claude_tunnel", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "browser_url", :namespace "claude_tunnel", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "set_browser_languages", :namespace "claude_tunnel", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "validate_browser_url", :namespace "claude_tunnel", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "write_environment_entries", :namespace "claude_tunnel", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "privileged_name", :namespace "claude_tunnel::SteamCommand", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "discover_steam_loopback_ports", :namespace "claude_tunnel::root", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "owned_socket_inodes", :namespace "claude_tunnel::root", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "parse_environment", :namespace "claude_tunnel::root", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "dispatch", :namespace "claude_tunnel", :complexity 3, :coverage 80.0, :crap 3.072}
-  {:name "prepare_tray", :namespace "claude_tunnel", :complexity 3, :coverage 94.4444, :crap 3.0015}
-  {:name "exit_code", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "matching_tunnel_name", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "merge_environment", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "merge_status", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "prepare_browser_profile", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "privileged_output", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "read_browser_preferences", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "status_for_endpoint", :namespace "claude_tunnel", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "is_user_steam_process", :namespace "claude_tunnel::root", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "steam_bridge_state_is_live", :namespace "claude_tunnel::root", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "steam_proxy_command", :namespace "claude_tunnel::root", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "validate_private_file", :namespace "claude_tunnel::root", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "report_status", :namespace "claude_tunnel", :complexity 2, :coverage 71.4286, :crap 2.0933}
-  {:name "run_steam_command", :namespace "claude_tunnel", :complexity 2, :coverage 80.0, :crap 2.032}
-  {:name "create_environment_file", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "ensure_tunnel_available", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "execute_protected", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "handle_actions", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "handle_actions_with_runtime", :namespace "claude_tunnel", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "invoke_privileged", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "launch_paths", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "main", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "numeric_id", :namespace "claude_tunnel", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "prepare_launch", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "protected_claude_environment", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "report_steam_status", :namespace "claude_tunnel", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "resolve_program", :namespace "claude_tunnel", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "run", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "run_browser", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "run_browser_command", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "run_claude", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "run_claude_command", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "run_privileged_steam_command", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "write_environment_request", :namespace "claude_tunnel", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "connect", :namespace "claude_tunnel::DesktopRuntime", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "disconnect", :namespace "claude_tunnel::DesktopRuntime", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "quit", :namespace "claude_tunnel::DesktopRuntime", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "set_autostart", :namespace "claude_tunnel::DesktopRuntime", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "set_steam_bridge", :namespace "claude_tunnel::DesktopRuntime", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "acquire_lock", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "active_endpoint", :namespace "claude_tunnel::root", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "allow_steam_proxy_ports", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
@@ -93,7 +39,7 @@
   {:name "run_in_namespace", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "spawn_steam_proxy", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "start_steam_bridge", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "steam_bridge_is_up", :namespace "claude_tunnel::root", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "steam_bridge_available", :namespace "claude_tunnel::root", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "steam_bridge_state_values", :namespace "claude_tunnel::root", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "steam_firewall_command", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "terminate_proxy_children", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
@@ -108,25 +54,10 @@
   {:name "write_runtime_config", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "write_runtime_files", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "write_steam_bridge_state", :namespace "claude_tunnel::root", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "icon_pixmap", :namespace "claude_tunnel::tray::ClaudeTray", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "id", :namespace "claude_tunnel::tray::ClaudeTray", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "title", :namespace "claude_tunnel::tray::ClaudeTray", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "tool_tip", :namespace "claude_tunnel::tray::ClaudeTray", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "steam_bridge_up", :namespace "claude_tunnel::root", :complexity 1, :coverage 37.5, :crap 1.2441}
   {:name "down", :namespace "claude_tunnel::root", :complexity 1, :coverage 42.8571, :crap 1.1866}
   {:name "steam_bridge_down", :namespace "claude_tunnel::root", :complexity 1, :coverage 42.8571, :crap 1.1866}
   {:name "exec_as_sudo_user", :namespace "claude_tunnel::root", :complexity 1, :coverage 55.5556, :crap 1.0878}
-  {:name "browser_arguments", :namespace "claude_tunnel", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "browser_language_is_normalized", :namespace "claude_tunnel", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "connection_status", :namespace "claude_tunnel", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "detect_status", :namespace "claude_tunnel", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "disconnection_status", :namespace "claude_tunnel", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "ensure_browser_profile_is_closed", :namespace "claude_tunnel", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "exit_status_byte", :namespace "claude_tunnel", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "protected_claude_environment_with", :namespace "claude_tunnel", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "protected_privacy_environment", :namespace "claude_tunnel", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "setup_commands", :namespace "claude_tunnel::network", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "new", :namespace "claude_tunnel::network::CommandSpec", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cleanup_firewall_commands", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "command", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "display_command", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
@@ -136,6 +67,8 @@
   {:name "require_root", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "require_steam_ports", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "run_checked", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "steam_bridge_is_up", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "steam_proxy_process_group", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "up", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "write_localtime_config_at", :namespace "claude_tunnel::root", :complexity 1, :coverage 100.0, :crap 1.0}
 ]}
