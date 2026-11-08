@@ -72,6 +72,9 @@ security.sudo.extraRules = [{
 ```sh
 claude-tunnel tray                 # отдельная иконка Claude в трее
 claude-tunnel status               # connected / protected offline
+claude-tunnel steam status         # enabled / disabled
+claude-tunnel steam up             # включить узкий Steam IPC bridge
+claude-tunnel steam down           # убрать Steam IPC bridge
 claude-tunnel run --               # интерактивный Claude Code
 claude-tunnel run -- --continue    # аргументы передаются без shell
 ```
@@ -79,6 +82,18 @@ claude-tunnel run -- --continue    # аргументы передаются б�
 В трее можно выбрать любой `.conf` из `tunnels_dir`, переключить туннель,
 отключить его или включить автозапуск. Отключение туннеля означает для Claude
 режим `Protected: offline`, а не прямой доступ.
+
+Опция `Прокинуть Steam IPC` доступна при активном туннеле. Она находит только
+IPv4 loopback TCP-порты, которые в этот момент слушает процесс `steam` текущего
+пользователя, и создаёт для каждого пару локальных прокси: с `127.0.0.1` внутри
+namespace на адрес veth и с veth на `127.0.0.1` хоста. Claude не получает host
+network namespace, доступ к произвольным портам хоста или обход VPN. Публичный
+Steam listener `0.0.0.0:27036` также не прокидывается.
+
+Сначала запустите Steam на хосте, затем включите опцию в трее или выполните
+`claude-tunnel steam up`. После перезапуска Steam выключите и снова включите
+мост: его IPC-порты динамические. Отключение основного туннеля автоматически
+удаляет все Steam-прокси; по умолчанию мост выключен.
 
 Пункт `Открыть браузер` доступен только при активном туннеле. Он запускает
 Chromium в том же network namespace с отдельным профилем из

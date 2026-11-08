@@ -5,6 +5,7 @@ pub const HOST_VETH: &str = "ct-host";
 pub const NS_VETH: &str = "ct-ns";
 pub const WG_INTERFACE: &str = "ct-wg";
 pub const FIREWALL_CHAIN: &str = "CT_GUARD";
+pub const HOST_FIREWALL_CHAIN: &str = "CT_HOST_GUARD";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandSpec {
@@ -78,6 +79,20 @@ pub fn setup_commands(endpoint: SocketAddrV4, runtime_config: &str) -> Vec<Comma
             &["-q", "-w", "net.ipv4.conf.ct-host.forwarding=1"],
         ),
         CommandSpec::new("iptables", &["-N", FIREWALL_CHAIN]),
+        CommandSpec::new("iptables", &["-N", HOST_FIREWALL_CHAIN]),
+        CommandSpec::new("iptables", &["-A", HOST_FIREWALL_CHAIN, "-j", "DROP"]),
+        CommandSpec::new(
+            "iptables",
+            &[
+                "-I",
+                "INPUT",
+                "1",
+                "-i",
+                HOST_VETH,
+                "-j",
+                HOST_FIREWALL_CHAIN,
+            ],
+        ),
         CommandSpec::new(
             "iptables",
             &[
@@ -162,22 +177,27 @@ mod tests {
             .filter(|command| command.program == "iptables")
             .collect();
 
-        assert_eq!(firewall.len(), 6);
+        assert_eq!(firewall.len(), 9);
         assert_eq!(firewall[0].args, ["-N", FIREWALL_CHAIN]);
-        assert!(firewall[2]
+        assert_eq!(firewall[1].args, ["-N", HOST_FIREWALL_CHAIN]);
+        assert_eq!(
+            &firewall[2].args[firewall[2].args.len() - 2..],
+            ["-j", "DROP"]
+        );
+        assert!(firewall[5]
             .args
             .windows(2)
             .any(|pair| pair == ["-d", "192.0.2.1"]));
-        assert!(firewall[2]
+        assert!(firewall[5]
             .args
             .windows(2)
             .any(|pair| pair == ["--dport", "51820"]));
         assert_eq!(
-            &firewall[3].args[firewall[3].args.len() - 2..],
+            &firewall[6].args[firewall[6].args.len() - 2..],
             ["-j", "DROP"]
         );
-        assert_eq!(firewall[4].args.first().map(String::as_str), Some("-I"));
-        assert!(firewall[5].args.contains(&"MASQUERADE".to_string()));
+        assert_eq!(firewall[7].args.first().map(String::as_str), Some("-I"));
+        assert!(firewall[8].args.contains(&"MASQUERADE".to_string()));
     }
 
     #[test]

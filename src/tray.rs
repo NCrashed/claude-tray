@@ -1,5 +1,6 @@
 use crate::status::Status;
 use crate::{autostart, icon, tunnel};
+use claude_tunnel::root;
 use ksni::menu::{CheckmarkItem, RadioGroup, RadioItem, StandardItem};
 use std::path::PathBuf;
 use tokio::sync::mpsc;
@@ -9,6 +10,7 @@ pub enum Action {
     Connect(tunnel::Tunnel),
     Disconnect,
     OpenBrowser,
+    SetSteamBridge(bool),
     SetAutostart(bool),
     Quit,
 }
@@ -98,6 +100,19 @@ impl ksni::Tray for ClaudeTray {
                 .into(),
             );
             items.push(
+                CheckmarkItem {
+                    label: "Прокинуть Steam IPC".into(),
+                    checked: root::steam_bridge_is_up(),
+                    activate: Box::new(|tray: &mut Self| {
+                        let _ = tray
+                            .action_tx
+                            .send(Action::SetSteamBridge(!root::steam_bridge_is_up()));
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+            );
+            items.push(
                 StandardItem {
                     label: "Disconnect (Claude stays offline)".into(),
                     activate: Box::new(|tray: &mut Self| {
@@ -111,6 +126,14 @@ impl ksni::Tray for ClaudeTray {
             items.push(
                 StandardItem {
                     label: "Открыть браузер".into(),
+                    enabled: false,
+                    ..Default::default()
+                }
+                .into(),
+            );
+            items.push(
+                CheckmarkItem {
+                    label: "Прокинуть Steam IPC".into(),
                     enabled: false,
                     ..Default::default()
                 }
@@ -178,6 +201,11 @@ mod tests {
         assert!(menu.iter().any(|item| matches!(
             item,
             ksni::MenuItem::Standard(item) if item.label == "Открыть браузер" && !item.enabled
+        )));
+        assert!(menu.iter().any(|item| matches!(
+            item,
+            ksni::MenuItem::Checkmark(item)
+                if item.label == "Прокинуть Steam IPC" && !item.enabled && !item.checked
         )));
     }
 }

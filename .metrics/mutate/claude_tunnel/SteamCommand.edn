@@ -1,0 +1,1 @@
+{:version 1 :tested-at "2026-11-09T00:46:27+03:00" :source "src/main.rs" :namespace "claude_tunnel::SteamCommand" :outcomes {} :forms [{:id "defn-/privileged_name" :kind "defn-" :file "src/main.rs" :line 102 :end-line 108 :hash "43c34a8f1a31694d434d7056533e410c76ccb9d34497c3c05798a705abcea414" :killed 0 :survived 0 :uncovered 0 :sites 0}]}

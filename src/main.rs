@@ -50,6 +50,11 @@ enum CliCommand {
     },
     /// Print whether Claude Code has a usable tunnel.
     Status,
+    /// Control the narrow Steam IPC bridge into Claude's namespace.
+    Steam {
+        #[command(subcommand)]
+        command: SteamCommand,
+    },
     #[command(name = "__open-url", hide = true)]
     OpenUrl { url: OsString },
     #[command(name = "__root", hide = true)]
@@ -65,6 +70,8 @@ enum RootCommand {
         config: PathBuf,
     },
     Down,
+    SteamUp,
+    SteamDown,
     Exec {
         #[arg(long)]
         uid: u32,
@@ -79,6 +86,26 @@ enum RootCommand {
         #[arg(last = true)]
         arguments: Vec<OsString>,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum SteamCommand {
+    /// Discover Steam's loopback listeners and expose only those to Claude.
+    Up,
+    /// Remove every Steam IPC proxy.
+    Down,
+    /// Print whether the Steam IPC bridge is live.
+    Status,
+}
+
+impl SteamCommand {
+    fn privileged_name(&self) -> Option<&'static str> {
+        match self {
+            Self::Up => Some("steam-up"),
+            Self::Down => Some("steam-down"),
+            Self::Status => None,
+        }
+    }
 }
 
 #[tokio::main]
@@ -117,8 +144,27 @@ async fn dispatch_user(command: CliCommand) -> Result<u8, String> {
         CliCommand::Browser { arguments } => run_browser_command(&arguments),
         CliCommand::OpenUrl { url } => spawn_protected_browser(&url),
         CliCommand::Status => report_status(),
+        CliCommand::Steam { command } => run_steam_command(command).await,
         CliCommand::Root { .. } => Err("root command crossed the user dispatch boundary".into()),
     }
+}
+
+async fn run_steam_command(command: SteamCommand) -> Result<u8, String> {
+    if let Some(command) = command.privileged_name() {
+        run_privileged_steam_command(command).await
+    } else {
+        report_steam_status()
+    }
+}
+
+async fn run_privileged_steam_command(command: &str) -> Result<u8, String> {
+    privileged(&[OsStr::new(command)]).await.map(|()| SUCCESS)
+}
+
+fn report_steam_status() -> Result<u8, String> {
+    let enabled = root::steam_bridge_is_up();
+    println!("{}", if enabled { "enabled" } else { "disabled" });
+    Ok(if enabled { SUCCESS } else { PROTECTED_OFFLINE })
 }
 
 fn run_claude_command(arguments: &[OsString]) -> Result<u8, String> {
@@ -163,6 +209,8 @@ fn run_root(command: RootCommand) -> Result<u8, String> {
     match command {
         RootCommand::Up { config } => root::up(&config).map(|()| SUCCESS),
         RootCommand::Down => root::down().map(|()| SUCCESS),
+        RootCommand::SteamUp => root::steam_bridge_up().map(|()| SUCCESS),
+        RootCommand::SteamDown => root::steam_bridge_down().map(|()| SUCCESS),
         RootCommand::Exec {
             uid,
             gid,
@@ -238,6 +286,7 @@ trait ActionRuntime {
     async fn connect(&self, target: tunnel::Tunnel);
     async fn disconnect(&self);
     fn open_browser(&self);
+    async fn set_steam_bridge(&self, enabled: bool);
     fn set_autostart(&self, enabled: bool);
     fn quit(&self);
 }
@@ -261,6 +310,7 @@ async fn dispatch_action<R: ActionRuntime>(action: Action, runtime: &R) {
         Action::Connect(target) => runtime.connect(target).await,
         Action::Disconnect => runtime.disconnect().await,
         Action::OpenBrowser => runtime.open_browser(),
+        Action::SetSteamBridge(enabled) => runtime.set_steam_bridge(enabled).await,
         Action::SetAutostart(enabled) => runtime.set_autostart(enabled),
         Action::Quit => runtime.quit(),
     }
@@ -291,6 +341,14 @@ impl ActionRuntime for DesktopRuntime {
                 error!("{message}");
             }
         });
+    }
+
+    async fn set_steam_bridge(&self, enabled: bool) {
+        let command = ["steam-down", "steam-up"][usize::from(enabled)];
+        privileged(&[OsStr::new(command)])
+            .await
+            .unwrap_or_else(|message| error!("{message}"));
+        self.handle.update(|_| {}).await;
     }
 
     fn set_autostart(&self, enabled: bool) {
@@ -868,11 +926,25 @@ AllowedIPs = 0.0.0.0/0
         })
         .await
         .is_err());
+        assert!(dispatch(CliCommand::Steam {
+            command: SteamCommand::Status
+        })
+        .await
+        .is_ok());
+    }
+
+    #[test]
+    fn steam_cli_maps_only_mutating_actions_to_the_root_helper() {
+        assert_eq!(SteamCommand::Up.privileged_name(), Some("steam-up"));
+        assert_eq!(SteamCommand::Down.privileged_name(), Some("steam-down"));
+        assert_eq!(SteamCommand::Status.privileged_name(), None);
     }
 
     #[test]
     fn root_dispatch_rejects_every_variant_for_unprivileged_callers() {
         assert!(run_root(RootCommand::Down).is_err());
+        assert!(run_root(RootCommand::SteamUp).is_err());
+        assert!(run_root(RootCommand::SteamDown).is_err());
         assert!(run_root(RootCommand::Up {
             config: PathBuf::from("missing")
         })
@@ -933,6 +1005,10 @@ AllowedIPs = 0.0.0.0/0
             self.0.lock().unwrap().push("disconnect");
         }
 
+        async fn set_steam_bridge(&self, _enabled: bool) {
+            self.0.lock().unwrap().push("steam");
+        }
+
         fn set_autostart(&self, _enabled: bool) {
             self.0.lock().unwrap().push("autostart");
         }
@@ -958,6 +1034,7 @@ AllowedIPs = 0.0.0.0/0
             .unwrap();
         sender.send(Action::Disconnect).unwrap();
         sender.send(Action::OpenBrowser).unwrap();
+        sender.send(Action::SetSteamBridge(true)).unwrap();
         sender.send(Action::SetAutostart(true)).unwrap();
         sender.send(Action::Quit).unwrap();
         drop(sender);
@@ -966,7 +1043,14 @@ AllowedIPs = 0.0.0.0/0
 
         assert_eq!(
             *runtime.0.lock().unwrap(),
-            ["connect", "disconnect", "browser", "autostart", "quit"]
+            [
+                "connect",
+                "disconnect",
+                "browser",
+                "steam",
+                "autostart",
+                "quit"
+            ]
         );
     }
 
